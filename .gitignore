@@ -11,11 +11,15 @@ __pycache__/
 venv/
 ENV/
 .venv/
+userenv/
 
 # Data files (large)
 *.zip
 data/pdfs/
 data_subset/
+
+# Index storage (environment-specific)
+storage/
 
 # IDE
 .idea/
