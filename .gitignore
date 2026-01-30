@@ -1,0 +1,31 @@
+# API keys and secrets
+*.env
+openai_key.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+
+# Data files (large)
+*.zip
+data/pdfs/
+data_subset/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+pip/

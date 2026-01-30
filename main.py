@@ -2,6 +2,7 @@ from typing import Annotated,List
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader,StorageContext, load_index_from_storage
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from IPython.display import Markdown
 from llama_index.core import Settings
 from dotenv import load_dotenv
@@ -16,6 +17,9 @@ config_path = "./openai_key.env"
 load_dotenv(dotenv_path=config_path)
 api_key = os.getenv('OPENAI_API_KEY')
 os.environ["OPENAI_API_KEY"]= api_key
+
+# Use local embedding model for fast indexing (no API rate limits)
+Settings.embed_model = HuggingFaceEmbedding(model_name='BAAI/bge-small-en-v1.5')
 
 # Setting chunk size for llamaindex, 512 and 50 are the default parameters, which are proved to be effective based on the documentation
 # https://www.llamaindex.ai/blog/evaluating-the-ideal-chunk-size-for-a-rag-system-using-llamaindex-6207e5d3fec5
@@ -55,12 +59,15 @@ def update_query_engine(index):
 
 app = FastAPI()
 
-# Function to filter out all non txt files, and record their filename in a list
+# Supported file extensions for ingestion
+SUPPORTED_EXTENSIONS = ('.txt', '.pdf')
+
+# Function to filter out unsupported files, and record their filename in a list
 def filter_file_format(files: List[UploadFile]) -> List[UploadFile]:
-    filtered_files = [file for file in files if file.filename.endswith('.txt')]
+    filtered_files = [file for file in files if file.filename.endswith(SUPPORTED_EXTENSIONS)]
 
     #Record removed files for response
-    removed_files = [file for file in files if not file.filename.endswith('.txt')]
+    removed_files = [file for file in files if not file.filename.endswith(SUPPORTED_EXTENSIONS)]
     removed_documents=[]
     for removed_file in removed_files:
         removed_documents.append(removed_file.filename)
@@ -133,14 +140,46 @@ async def ingest(
 async def search_query(query: str ):
     #Retrieve response from the query engine
     if query =='':
-        return JSONResponse(status_code=400, content={"message": "No query text detected. Please ensure query is not empty."}) 
-    try: 
+        return JSONResponse(status_code=400, content={"message": "No query text detected. Please ensure query is not empty."})
+    try:
       # Generate query using the query engine, markdown the response and return the results
       response =  query_engine.query(query)
       results = Markdown(f"{response}")
       return {"query": query, "results": results.data}
     except Exception as e:
       return JSONResponse(status_code=500, content={"message": f"Failed to process query: {str(e)}"})
+
+
+#Query with Context API - returns response with source information for evaluation
+@app.get("/query_with_context")
+async def query_with_context(query: str):
+    """Query endpoint that returns both the answer and source documents for evaluation."""
+    if query == '':
+        return JSONResponse(status_code=400, content={"message": "No query text detected. Please ensure query is not empty."})
+    try:
+        response = query_engine.query(query)
+
+        # Extract source nodes/chunks information
+        sources = []
+        if hasattr(response, 'source_nodes'):
+            for node in response.source_nodes:
+                source_info = {
+                    "text": node.node.text[:500] if hasattr(node.node, 'text') else "",
+                    "score": node.score if hasattr(node, 'score') else None,
+                }
+                # Extract filename from metadata
+                if hasattr(node.node, 'metadata') and node.node.metadata:
+                    source_info["filename"] = node.node.metadata.get('filename', '')
+                    source_info["metadata"] = node.node.metadata
+                sources.append(source_info)
+
+        return {
+            "query": query,
+            "answer": str(response),
+            "sources": sources
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": f"Failed to process query: {str(e)}"})
 
 
 #Retrieve html code for the main interface from chat_interface.html
