@@ -50,9 +50,12 @@ The folder contains:
 
 Download both zip files and extract them:
 ```bash
-mkdir pdfs
-unzip pdfs-20250915T225624Z-1-001.zip -d pdfs/
-unzip pdfs-20250915T225624Z-1-002.zip -d pdfs/
+# The zips contain a pdfs/ folder, so extract to current directory
+unzip pdfs-20250915T225624Z-1-001.zip
+unzip pdfs-20250915T225624Z-1-002.zip
+
+# Verify extraction (should show ~200 PDFs)
+ls pdfs/*.pdf | wc -l
 ```
 
 ### Step 4: Start the Server
@@ -81,17 +84,23 @@ for pdf in pdfs/*.pdf; do
 done
 ```
 
-> **Note**: The first time you ingest documents, the system will create a vector index in `storage/`. This may take several minutes for 200 PDFs.
+> **Note**: The repo includes a pre-built index for demo data. When you ingest the evaluation PDFs, delete the existing `storage/` folder first to rebuild the index:
+> ```bash
+> rm -rf storage/
+> ```
+> Ingesting 200 PDFs may take several minutes.
 
 ### Step 6: Run Evaluation
 
 ```bash
-# Extract keywords from expected answers (one-time, ~$0.10)
-python extract_keywords.py
-
 # Run the evaluation
 python evaluate.py
 ```
+
+> **Note**: Keywords are pre-extracted in `Eval_data_subset.csv`. If you modify the expected answers or want to re-extract, run:
+> ```bash
+> python extract_keywords.py  # One-time, ~$0.10
+> ```
 
 ## Evaluation Results
 
@@ -136,8 +145,8 @@ RAG-eval/
 ├── eval_results.csv         # Output: per-question evaluation results
 ├── Requirements.txt         # Python dependencies
 ├── openai_key.env.example   # Template for API key configuration
-├── storage/                 # Vector index (created on first ingest)
-├── data/                    # Sample text documents
+├── storage/                 # Vector index (pre-built for demo data)
+├── data/                    # Sample text documents (for demo)
 ├── sample/                  # Demo files for testing
 └── Images/                  # Screenshots for documentation
 ```
